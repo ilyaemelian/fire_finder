@@ -1,0 +1,28 @@
+{
+  "module": "active_fire",
+  "architecture": "YOLO11n detection",
+  "weights": "best.pt",
+  "weights_sha256": "67CF0A789C50C7FA4402F0B8B394BD5A8984DAF0CCE9FECF8C2FF35E8EA1251A",
+  "training_log": "results_yolo.csv",
+  "training_log_sha256": "729E310EC7ECA3536287F83C1196AC13393BF95A18B787240305050F08C4AC92",
+  "image_size": 1024,
+  "upscale": 4,
+  "mask_confidence": 0.5,
+  "declared_local_f1": 0.4176,
+  "declared_precision": 0.2836,
+  "declared_recall": 0.792,
+  "declared_training_environment": {
+    "python": "3.14",
+    "torch": "2.11.0+cu128",
+    "ultralytics": "8.4.155"
+  },
+  "verified_inference_environment": {
+    "python": "3.13.3",
+    "torch": "2.7.1+cu118",
+    "ultralytics": "8.4.155",
+    "rasterio": "1.5.1",
+    "numpy": "2.3.4"
+  },
+  "verification": "weights_loaded_and_predict_af_returned_uint8_256x256_binary_mask_on_synthetic_viirs",
+  "training_reproduced": false
+}

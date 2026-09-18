@@ -1,0 +1,12 @@
+.venv/
+.venv-af/
+.venv-bs/
+__pycache__/
+.pytest_cache/
+frontend/node_modules/
+frontend/dist/
+data/*
+!data/.gitkeep
+catboost_info/
+.env
+*.log

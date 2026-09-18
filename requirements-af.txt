@@ -1,0 +1,6 @@
+# AF inference environment verified locally with best.pt.
+# For GPU, install the matching Torch build from the official PyTorch index.
+torch==2.7.1
+ultralytics==8.4.155
+rasterio==1.5.1
+numpy==2.3.4

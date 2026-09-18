@@ -1,0 +1,6 @@
+import type { Dataset,Query,Result } from './types';
+async function checked(response:Response) {if(!response.ok){const error=await response.json().catch(()=>({detail:'Сервер недоступен'}));throw new Error(typeof error.detail==='string'?error.detail:'Проверьте формат файлов, координаты и даты');}return response;}
+export async function catalog():Promise<Dataset[]> {return (await (await checked(await fetch('/api/observations'))).json()).datasets;}
+export async function analyze(query:Query):Promise<Result> {return (await checked(await fetch('/api/analysis',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(query)}))).json();}
+export async function upload(data:FormData):Promise<string>{return (await (await checked(await fetch('/api/results',{method:'POST',body:data}))).json()).dataset_id;}
+export async function download(result:Result,kind:'contours'|'summary'){const response=await checked(await fetch('/api/export/'+kind,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({result_id:result.result_id})}));const url=URL.createObjectURL(await response.blob());const a=document.createElement('a');a.href=url;a.download=kind==='contours'?'burned-areas.geojson':'summary.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}

@@ -1,0 +1,5 @@
+# Окружение модуля BS (models/burn_severity): обучение и инференс CatBoost.
+# Ставится отдельно от .venv веб-сервиса: catboost ему не нужен.
+catboost==1.2.10
+rasterio==1.5.1
+numpy==2.3.4
