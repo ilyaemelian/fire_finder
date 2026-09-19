@@ -77,9 +77,21 @@ def exported(query, kind):
     except FileNotFoundError as exc:
         raise HTTPException(404, "Результат не найден. Повторите расчёт") from exc
     if kind == "contours":
-        data = result["burned_areas"] | {"query": result["query"], "data_mode": result["data_mode"], "source": result["source"]}
+        # Система координат объявляется явно: геометрия в WGS84, площадь
+        # посчитана в равновеликой проекции EPSG:6933.
+        data = result["burned_areas"] | {
+            "crs": {"type": "name",
+                    "properties": {"name": "urn:ogc:def:crs:OGC:1.3:CRS84"}},
+            "area_crs": "EPSG:6933",
+            "query": result["query"],
+            "data_mode": result["data_mode"],
+            "source": result["source"],
+        }
     else:
-        data = {key: value for key, value in result.items() if key not in ("active_fires", "burned_areas")}
+        data = {key: value for key, value in result.items()
+                if key not in ("active_fires", "burned_areas")}
+        data["crs"] = "EPSG:4326"
+        data["area_crs"] = "EPSG:6933"
     return Response(json.dumps(data, ensure_ascii=False, allow_nan=False), media_type="application/geo+json" if kind == "contours" else "application/json", headers={"Content-Disposition": f'attachment; filename="{kind}-{query.result_id}.json"'})
 
 

@@ -15,6 +15,19 @@ import rasterio
 from models.active_fire.features import pixel_features, read_channels
 
 THRESHOLDS = (0.90, 0.99, 0.995, 0.999, 0.9995, 0.9999)
+PROTECTED = Path(__file__).resolve().parent / "artifacts"
+
+
+def guard_output(artifacts: Path, force: bool) -> Path:
+    """Запретить запись поверх исходных весов, переданных вместе с решением."""
+    artifacts = artifacts.resolve()
+    if artifacts == PROTECTED and not force:
+        raise SystemExit(
+            f"Каталог {PROTECTED} содержит исходные веса модуля AF и не перезаписывается.\n"
+            f"Укажите другой --output-dir, например outputs/training/active_fire, "
+            f"либо добавьте --force для сознательной замены."
+        )
+    return artifacts
 
 
 def mask_path(root: Path, chip_id: str) -> Path:
@@ -70,8 +83,11 @@ def main() -> None:
     parser.add_argument("--negatives-per-chip", type=int, default=1500)
     parser.add_argument("--estimators", type=int, default=500)
     parser.add_argument("--max-chips", type=int)
+    parser.add_argument("--force", action="store_true",
+                        help="разрешить запись поверх исходных весов модуля")
     args = parser.parse_args()
 
+    artifacts = guard_output(args.output_dir / "artifacts", args.force)
     random.seed(args.seed)
     np.random.seed(args.seed)
     os.environ["PYTHONHASHSEED"] = str(args.seed)
@@ -120,7 +136,6 @@ def main() -> None:
     y = np.concatenate([samples[chip][1] for chip in ids])
     model = classifier(args.seed, args.estimators).fit(x, y)
 
-    artifacts = args.output_dir / "artifacts"
     artifacts.mkdir(parents=True, exist_ok=True)
     weight = artifacts / "model.pkl"
     with weight.open("wb") as stream:

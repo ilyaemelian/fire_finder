@@ -29,6 +29,20 @@ from models.burn_severity.core import (
 
 SEED = 42
 UNET_CHANNELS = 40
+PROTECTED = Path(__file__).resolve().parent / "models"
+
+
+def guard_output(output: Path, force: bool) -> Path:
+    """Запретить запись поверх исходных весов, переданных вместе с решением."""
+    output = output.resolve()
+    if output == PROTECTED and not force:
+        raise SystemExit(
+            f"Каталог {PROTECTED} содержит исходные веса модуля BS и не перезаписывается.\n"
+            f"Укажите другой --output-dir, например "
+            f"outputs/training/burn_severity/models, либо добавьте --force "
+            f"для сознательной замены."
+        )
+    return output
 
 
 def sha256(path: Path) -> str:
@@ -286,8 +300,11 @@ def main() -> None:
     parser.add_argument("--batch", type=int, default=8)
     parser.add_argument("--encoder-weights", choices=("imagenet", "none"), default="imagenet")
     parser.add_argument("--max-chips", type=int)
+    parser.add_argument("--force", action="store_true",
+                        help="разрешить запись поверх исходных весов модуля")
     args = parser.parse_args()
 
+    models = guard_output(args.output_dir, args.force)
     device = "cuda" if args.device == "auto" and torch.cuda.is_available() else args.device
     if device == "auto":
         device = "cpu"
@@ -302,7 +319,6 @@ def main() -> None:
 
     root = args.data_dir / "bs" if (args.data_dir / "bs").is_dir() else args.data_dir
     ids = chip_ids(root, args.max_chips)
-    models = args.output_dir
     work = args.work or args.output_dir.parent / "work"
     models.mkdir(parents=True, exist_ok=True)
     print(f"BS: {len(ids)} обучающих чипов, device={device}, seed={args.seed}")

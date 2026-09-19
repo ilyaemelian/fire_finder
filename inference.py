@@ -57,6 +57,10 @@ def main() -> None:
     parser.add_argument("--only", choices=("af", "bs", "merge"),
                         help="выполнить только один шаг")
     parser.add_argument("--device", default="auto", help="для BS: auto, cuda или cpu")
+    parser.add_argument("--af-model", type=Path,
+                        help="иные веса AF, например после повторного обучения")
+    parser.add_argument("--bs-models", type=Path,
+                        help="иной каталог весов BS, например после повторного обучения")
     args = parser.parse_args()
 
     data_dir = args.data_dir.resolve()
@@ -68,16 +72,20 @@ def main() -> None:
     steps = ("af", "bs", "merge") if args.only is None else (args.only,)
 
     if "af" in steps:
+        arguments = ["--data-dir", str(data_dir), "--sample", str(sample),
+                     "--output", str(AF_RESULT)]
+        if args.af_model:
+            arguments += ["--model", str(args.af_model.resolve())]
         run("AF, активное горение", interpreter(".venv-af"),
-            "models.active_fire.inference",
-            ["--data-dir", str(data_dir), "--sample", str(sample),
-             "--output", str(AF_RESULT)])
+            "models.active_fire.inference", arguments)
 
     if "bs" in steps:
+        arguments = ["--data-dir", str(data_dir), "--output", str(BS_RESULT),
+                     "--device", args.device, "--sample", str(sample)]
+        if args.bs_models:
+            arguments += ["--models", str(args.bs_models.resolve())]
         run("BS, степень поражения", interpreter(".venv-bs"),
-            "models.burn_severity.inference_new",
-            ["--data-dir", str(data_dir), "--output", str(BS_RESULT),
-             "--device", args.device])
+            "models.burn_severity.inference_new", arguments)
 
     if "merge" in steps:
         run("Объединение по шаблону", Path(sys.executable),

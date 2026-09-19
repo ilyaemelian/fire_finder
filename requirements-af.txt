@@ -6,3 +6,5 @@ rasterio==1.5.1
 numpy==2.5.2
 pandas==3.0.5
 scipy==1.18.1
+# Только для исследовательской тетради research_af.ipynb:
+matplotlib==3.10.8

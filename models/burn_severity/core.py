@@ -170,9 +170,28 @@ def build_cache(root: Path, chip_ids: list[str], work: Path | None = None,
     if stream is not None:
         result["X"] = np.memmap(feature_path, dtype=np.float32, mode="r",
                                 shape=(int(offsets[-1]), len(names)))
-    else:
-        result["X"] = (np.concatenate(blocks) if blocks
-                       else np.zeros((0, len(names)), np.float32))
+        return result
+
+    # Матрица собирается копированием в заранее выделенный массив, а не
+    # объединением списка: объединение на время работы держит в памяти две
+    # полные копии, и на наборах в гигабайт и больше это приводит к обмену
+    # страниц с диском и видимому зависанию. Каждый блок освобождается сразу
+    # после копирования, поэтому пик равен размеру матрицы плюс один блок.
+    total = int(offsets[-1])
+    volume = total * len(names) * 4 / 1_073_741_824
+    if progress:
+        print(f"    матрица признаков: {total:,} строк × {len(names)} "
+              f"признаков, {volume:.2f} ГБ".replace(",", " "), flush=True)
+        if volume > 3.0:
+            print("    при нехватке памяти укажите --work <каталог>: "
+                  "признаки будут храниться на диске", flush=True)
+    matrix = np.empty((total, len(names)), np.float32)
+    position = 0
+    for number, block in enumerate(blocks):
+        matrix[position:position + len(block)] = block
+        position += len(block)
+        blocks[number] = None  # освободить блок сразу
+    result["X"] = matrix
     return result
 
 

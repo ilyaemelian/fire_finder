@@ -45,6 +45,9 @@ def main() -> None:
     parser.add_argument("--unet-weight", type=float, default=0.45)
     parser.add_argument("--threshold", type=float, default=0.4)
     parser.add_argument("--device", choices=("auto", "cuda", "cpu"), default="auto")
+    parser.add_argument("--sample", type=Path,
+                        help="шаблон состава строк; по умолчанию "
+                             "<data-dir>/sample_submission.csv")
     args = parser.parse_args()
 
     random.seed(SEED)
@@ -54,7 +57,12 @@ def main() -> None:
     device = select_device(args.device)
     started = time.perf_counter()
     test_root = args.data_dir / "bs"
-    template_path = args.data_dir / "sample_submission.csv"
+    template_path = args.sample or args.data_dir / "sample_submission.csv"
+    if not template_path.is_file():
+        raise SystemExit(
+            f"Не найден шаблон состава строк: {template_path}\n"
+            f"Укажите его параметром --sample."
+        )
     template = pd.read_csv(template_path)
     chip_ids = sorted(template.loc[template.chip_id.str.startswith("BS_"), "chip_id"].unique())
     cache = build_cache(test_root, chip_ids, args.work, "test", progress=True)

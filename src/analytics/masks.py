@@ -121,15 +121,25 @@ def convert_submission(rows: list[dict], metadata: SubmissionMetadata):
     grouped: dict[str, dict[int, str]] = {}
     for row in rows:
         grouped.setdefault(str(row["chip_id"]), {})[int(row["class_id"])] = str(row["rle"])
-    if set(grouped) != set(metadata.chips):
-        missing = sorted(set(grouped) - set(metadata.chips))[:5]
-        extra = sorted(set(metadata.chips) - set(grouped))[:5]
+
+    # Геопривязка нужна только для показа на карте, поэтому достаточно совпадения
+    # по части фрагментов: показываются те, для которых координаты известны.
+    # Полное несовпадение означает, что файлы построены по разным наборам данных.
+    usable = sorted(set(grouped) & set(metadata.chips))
+    skipped = sorted(set(grouped) - set(metadata.chips))
+    if not usable:
         raise ValueError(
-            f"chip_id в CSV и JSON не совпадают; без метаданных: {missing}, без строк CSV: {extra}"
+            "Ни один chip_id из CSV не описан в JSON геопривязки. "
+            f"В CSV, например: {', '.join(sorted(grouped)[:3])}; "
+            f"в JSON: {', '.join(sorted(metadata.chips)[:3])}. "
+            "Файлы должны быть построены по одному набору данных: имена "
+            "обучающих фрагментов начинаются с AF_tr и BS_tr, тестовых — "
+            "с AF_te и BS_te."
         )
 
     observations, points, polygons = [], [], []
-    for chip_id, classes in grouped.items():
+    for chip_id in usable:
+        classes = grouped[chip_id]
         meta = metadata.chips[chip_id]
         if meta.kind == "af":
             if set(classes) != {1}:
@@ -150,6 +160,13 @@ def convert_submission(rows: list[dict], metadata: SubmissionMetadata):
         polygons.extend(burned)
 
     top = metadata.model_dump(mode="json", exclude={"chips"})
+    top["chips_shown"] = len(usable)
+    top["chips_skipped"] = len(skipped)
+    if skipped:
+        top["source"] = (
+            f"{top['source']}. Показано {len(usable)} фрагментов, "
+            f"{len(skipped)} пропущено без геопривязки"
+        )[:300]
     return {
         "metadata": top,
         "observations": collection(observations),

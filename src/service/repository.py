@@ -35,8 +35,11 @@ def catalog():
         data = json.loads(path.read_text(encoding="utf-8"))
         meta = data["metadata"]
         features = data["observations"]["features"]
-        bs_features = [feature for feature in features if feature["properties"]["kind"] == "bs"]
-        footprint = unary_union([shape(feature["geometry"]) for feature in (bs_features or features)])
+        # Границы набора охватывают наблюдения обоих модулей. Прежде они
+        # считались только по фрагментам BS, и термоточки AF за их пределами
+        # не попадали ни в первоначальный расчёт по всему набору, ни в поле
+        # зрения карты.
+        footprint = unary_union([shape(feature["geometry"]) for feature in features])
         dates = []
         for feature in features:
             props = feature["properties"]
@@ -51,4 +54,7 @@ def catalog():
             "date_to": max(dates),
             "observations": data["observations"],
         })
+    # Наборы с настоящими предсказаниями идут первыми: интерфейс открывает
+    # первый в списке, и учебный синтетический набор не должен его занимать.
+    out.sort(key=lambda item: (item["data_mode"] != "real", item["title"]))
     return out

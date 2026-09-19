@@ -94,6 +94,57 @@ def test_invalid_metadata_query_and_paths(client):
     assert client.get("/api/missing").status_code == 404
 
 
+def test_submission_partial_geolocation_shows_known_chips(client):
+    """Фрагменты без геопривязки пропускаются, остальные показываются."""
+    csv_bytes = (
+        "chip_id,class_id,rle\n"
+        "AF_KNOWN,1,1 1\n"
+        "AF_UNKNOWN,1,1 1\n"
+    ).encode()
+    metadata = {
+        "title": "Частичная геопривязка",
+        "data_mode": "real",
+        "source": "test",
+        "chips": {
+            "AF_KNOWN": {
+                "kind": "af", "observation_id": "AF_KNOWN", "crs": "EPSG:32637",
+                "transform": [20, 0, 494880, 0, -20, 5105120],
+                "model_version": "af-test",
+                "acquisition_datetime": "2025-09-12T10:30:00Z",
+            },
+        },
+    }
+    response = client.post("/api/results/submission", files={
+        "submission": ("submission.csv", csv_bytes, "text/csv"),
+        "metadata": ("metadata.json", json.dumps(metadata).encode(), "application/json"),
+    })
+    assert response.status_code == 201, response.text
+
+
+def test_submission_rejects_fully_mismatched_chips(client):
+    """Полное несовпадение состава отклоняется с понятной причиной."""
+    csv_bytes = b"chip_id,class_id,rle\nAF_te_000001,1,1 1\n"
+    metadata = {
+        "title": "Несовпадение",
+        "data_mode": "real",
+        "source": "test",
+        "chips": {
+            "AF_tr_000001": {
+                "kind": "af", "observation_id": "AF_tr_000001", "crs": "EPSG:32637",
+                "transform": [20, 0, 494880, 0, -20, 5105120],
+                "model_version": "af-test",
+                "acquisition_datetime": "2025-09-12T10:30:00Z",
+            },
+        },
+    }
+    response = client.post("/api/results/submission", files={
+        "submission": ("submission.csv", csv_bytes, "text/csv"),
+        "metadata": ("metadata.json", json.dumps(metadata).encode(), "application/json"),
+    })
+    assert response.status_code == 422
+    assert "не описан" in response.json()["detail"]
+
+
 def test_submission_csv_upload_keeps_competition_schema(client):
     csv_bytes = (
         "chip_id,class_id,rle\n"
