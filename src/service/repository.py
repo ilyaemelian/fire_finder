@@ -34,8 +34,21 @@ def catalog():
     for path in sorted((data_root() / "datasets").glob("*.json")):
         data = json.loads(path.read_text(encoding="utf-8"))
         meta = data["metadata"]
-        # Fit initially to BS: AF covers a much wider area.
-        footprint = unary_union([shape(f["geometry"]) for f in data["observations"]["features"] if f["properties"]["kind"] == "bs"])
-        dates = [meta["active_fire"]["acquisition_datetime"][:10], meta["burn_severity"]["date_post"]]
-        out.append({"id": path.stem, "title": meta["title"], "data_mode": meta["data_mode"], "source": meta["source"], "bounds": list(footprint.bounds), "date_from": min(dates), "date_to": max(dates), "observations": data["observations"]})
+        features = data["observations"]["features"]
+        bs_features = [feature for feature in features if feature["properties"]["kind"] == "bs"]
+        footprint = unary_union([shape(feature["geometry"]) for feature in (bs_features or features)])
+        dates = []
+        for feature in features:
+            props = feature["properties"]
+            dates.append((props.get("acquisition_datetime") or props.get("date_post"))[:10])
+        out.append({
+            "id": path.stem,
+            "title": meta["title"],
+            "data_mode": meta["data_mode"],
+            "source": meta["source"],
+            "bounds": list(footprint.bounds),
+            "date_from": min(dates),
+            "date_to": max(dates),
+            "observations": data["observations"],
+        })
     return out

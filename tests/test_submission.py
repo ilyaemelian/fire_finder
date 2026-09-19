@@ -5,7 +5,7 @@ import pytest
 
 from models.common.rle import decode_rle, encode_rle
 from models.common.submission import kinds_present, read_rows, validate_rows, write_rows
-from scripts.collect_results import collect
+from scripts.collect_results import collect, fill_template
 
 
 def test_rle_is_row_major_and_canonical():
@@ -108,3 +108,21 @@ def test_partial_answer_requires_an_explicit_flag(tmp_path):
     assert collect(sample, root, output, fill_from_sample=True) == {
         "rows": 4, "nonempty": 1, "pixels": 1
     }
+
+
+def test_module_answer_fills_the_rest_of_the_template(tmp_path):
+    """Пайплайн модуля даёт файл, полный по структуре: чужие строки пустые."""
+    _, sample = prepare(tmp_path)
+    output = tmp_path / "submission_af.csv"
+    rows = [{"chip_id": "AF_1", "class_id": 1, "rle": "1 1"}]
+    assert fill_template(sample, rows, output) == {"rows": 4, "nonempty": 1, "pixels": 1}
+    written = {(r["chip_id"], r["class_id"]): r["rle"] for r in read_rows(output)}
+    assert written[("AF_1", 1)] == "1 1"
+    assert all(written[("BS_1", k)] == "" for k in (1, 2, 3))
+
+
+def test_module_answer_rejects_rows_outside_the_template(tmp_path):
+    _, sample = prepare(tmp_path)
+    rows = [{"chip_id": "AF_9", "class_id": 1, "rle": "1 1"}]
+    with pytest.raises(ValueError, match="отсутствующие в шаблоне"):
+        fill_template(sample, rows, tmp_path / "submission_af.csv")

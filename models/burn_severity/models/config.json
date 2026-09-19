@@ -1,0 +1,13 @@
+{
+  "module": "burn_severity",
+  "scheme": "двухэтапный бустинг + U-Net, смесь вероятностей, степень по правилу dNBR",
+  "n_folds": 5,
+  "pass1_weights": "pass1_fold{fold}.ubj",
+  "pass2_weights": "pass2.ubj",
+  "unet_weights": "unet_full_ep25.pt",
+  "unet_norm": "unet_norm.json",
+  "features": "features.json",
+  "unet_weight": 0.45,
+  "threshold": 0.4,
+  "seed": 42
+}

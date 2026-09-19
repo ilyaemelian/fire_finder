@@ -1,16 +1,18 @@
 import json
 import uuid
-from pathlib import Path
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
-from src.analytics.masks import read_mask, convert_masks, MAX_FILE
+
+from src.analytics.masks import (
+    read_mask, convert_masks, read_submission, convert_submission, MAX_FILE, MAX_SUBMISSION,
+)
 from src.analytics.analysis import analyze
-from src.service.schemas import Metadata, AnalysisQuery, ExportQuery
+from src.service.schemas import Metadata, SubmissionMetadata, AnalysisQuery, ExportQuery
 from src.service.repository import save_json, load_json, catalog, ROOT
 
-app = FastAPI(title="Мониторинг природных пожаров", version="0.1.0")
+app = FastAPI(title="Мониторинг природных пожаров", version="0.2.0")
 
 
 @app.get("/api/health")
@@ -30,9 +32,26 @@ async def upload_results(active_fire: UploadFile = File(...), burn_severity: Upl
         if len(raw) > 65536:
             raise ValueError("Метаданные превышают 64 КБ")
         meta = Metadata.model_validate_json(raw)
-        af = read_mask(await active_fire.read(MAX_FILE+1), "af")
-        bs = read_mask(await burn_severity.read(MAX_FILE+1), "bs")
+        af = read_mask(await active_fire.read(MAX_FILE + 1), "af")
+        bs = read_mask(await burn_severity.read(MAX_FILE + 1), "bs")
         data = convert_masks(af, bs, meta)
+    except (ValueError, ValidationError) as exc:
+        raise HTTPException(422, detail=str(exc)) from exc
+    ident = uuid.uuid4().hex
+    save_json("datasets", ident, data)
+    return {"dataset_id": ident}
+
+
+@app.post("/api/results/submission", status_code=201)
+async def upload_submission(submission: UploadFile = File(...), metadata: UploadFile = File(...)):
+    """Принять конкурсный CSV без изменения схемы и отдельную геопривязку."""
+    try:
+        raw_meta = await metadata.read(4 * 1024 * 1024 + 1)
+        if len(raw_meta) > 4 * 1024 * 1024:
+            raise ValueError("Метаданные submission превышают 4 МБ")
+        meta = SubmissionMetadata.model_validate_json(raw_meta)
+        rows = read_submission(await submission.read(MAX_SUBMISSION + 1))
+        data = convert_submission(rows, meta)
     except (ValueError, ValidationError) as exc:
         raise HTTPException(422, detail=str(exc)) from exc
     ident = uuid.uuid4().hex
@@ -60,7 +79,7 @@ def exported(query, kind):
     if kind == "contours":
         data = result["burned_areas"] | {"query": result["query"], "data_mode": result["data_mode"], "source": result["source"]}
     else:
-        data = {k: v for k,v in result.items() if k not in ("active_fires", "burned_areas")}
+        data = {key: value for key, value in result.items() if key not in ("active_fires", "burned_areas")}
     return Response(json.dumps(data, ensure_ascii=False, allow_nan=False), media_type="application/geo+json" if kind == "contours" else "application/json", headers={"Content-Disposition": f'attachment; filename="{kind}-{query.result_id}.json"'})
 
 

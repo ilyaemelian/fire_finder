@@ -112,12 +112,17 @@ def resolve_chip_paths(chip_path: Path) -> tuple[Path, Path]:
     root = chip_path.parent
     candidates = [
         (root / "viirs" / f"{chip_id}_VIIRS_I1-I5.tif", root / "aux" / f"{chip_id}_AUX.tif"),
+        (root / "viirs" / f"{chip_id}_VIIRS_I1-I5.tif", root / "aux_data" / f"{chip_id}_AUX.tif"),
         (Path(f"{chip_path}_VIIRS_I1-I5.tif"), Path(f"{chip_path}_AUX.tif")),
     ]
     for viirs, aux in candidates:
         if viirs.is_file() and aux.is_file():
             return viirs, aux
+    viirs_any = sorted(root.glob(f"*/{chip_id}_VIIRS_I1-I5.tif"))
+    aux_any = sorted(root.glob(f"*/{chip_id}_AUX.tif"))
+    if len(viirs_any) == len(aux_any) == 1:
+        return viirs_any[0], aux_any[0]
     raise FileNotFoundError(
         f"Файлы чипа не найдены. Проверены: "
-        f"{', '.join(str(path) for pair in candidates for path in pair)}"
+        f"{', '.join(str(path) for pair in candidates for path in pair)} и подкаталоги {root}"
     )

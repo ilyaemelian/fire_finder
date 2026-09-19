@@ -92,3 +92,47 @@ def test_invalid_metadata_query_and_paths(client):
     q=query(client);q["geometry"]={"type":"Point","coordinates":[39,46]}
     assert client.post("/api/analysis",json=q).status_code == 422
     assert client.get("/api/missing").status_code == 404
+
+
+def test_submission_csv_upload_keeps_competition_schema(client):
+    csv_bytes = (
+        "chip_id,class_id,rle\n"
+        "AF_TEST,1,1 1\n"
+        "BS_TEST,1,1 2\n"
+        "BS_TEST,2,10 1\n"
+        "BS_TEST,3,20 1\n"
+    ).encode()
+    metadata = {
+        "title": "CSV test",
+        "data_mode": "real",
+        "source": "test",
+        "chips": {
+            "AF_TEST": {
+                "kind": "af", "observation_id": "AF_TEST", "crs": "EPSG:32637",
+                "transform": [20, 0, 494880, 0, -20, 5105120],
+                "model_version": "af-test",
+                "acquisition_datetime": "2025-09-12T10:30:00Z"
+            },
+            "BS_TEST": {
+                "kind": "bs", "observation_id": "BS_TEST", "crs": "EPSG:32637",
+                "transform": [20, 0, 494880, 0, -20, 5105120],
+                "model_version": "bs-test",
+                "date_pre": "2025-08-20", "date_post": "2025-09-15"
+            }
+        }
+    }
+    response = client.post("/api/results/submission", files={
+        "submission": ("submission.csv", csv_bytes, "text/csv"),
+        "metadata": ("metadata.json", json.dumps(metadata).encode(), "application/json"),
+    })
+    assert response.status_code == 201, response.text
+    datasets = client.get("/api/observations").json()["datasets"]
+    uploaded = next(item for item in datasets if item["id"] == response.json()["dataset_id"])
+    analysis = client.post("/api/analysis", json={
+        "dataset_id": uploaded["id"], "geometry": mapping(box(*uploaded["bounds"])),
+        "date_from": "2025-08-01", "date_to": "2025-09-30",
+    })
+    assert analysis.status_code == 200, analysis.text
+    result = analysis.json()
+    assert result["summary"]["active_detection_count"] == 1
+    assert result["summary"]["burned_contour_count"] == 3

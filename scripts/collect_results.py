@@ -19,6 +19,7 @@
 """
 
 import argparse
+from collections.abc import Iterable
 from pathlib import Path
 
 from models.common.submission import (
@@ -58,6 +59,34 @@ def check_file(path: Path) -> dict[str, int]:
     kinds = "+".join(sorted(kind.upper() for kind in kinds_present(rows)))
     print(f"Ошибок нет: {path} · {kinds} · {stats['rows']} строк, "
           f"{stats['nonempty']} непустых матриц, {stats['pixels']} положительных пикселей")
+    return stats
+
+
+def fill_template(sample_path: Path, rows: Iterable[Row], output_path: Path) -> dict[str, int]:
+    """Разложить строки одного модуля по шаблону и записать файл ответа.
+
+    Строки, которых модуль не даёт, берутся из шаблона, то есть с пустым полем
+    `rle`. Получается файл, полный по структуре и заведомо неполный по
+    содержанию: его можно отправить на лидерборд, чтобы увидеть вклад одного
+    модуля отдельно. Этим пользуются `scripts/run_af_pipeline.py` и
+    `scripts/run_bs_pipeline.py`; общий ответ по-прежнему собирает `collect`.
+    """
+    template = read_rows(sample_path)
+    order = [(str(row["chip_id"]), int(row["class_id"])) for row in template]
+    template_rows = {pair: row for pair, row in zip(order, template)}
+    predictions = {(str(row["chip_id"]), int(row["class_id"])): row for row in rows}
+
+    extra = sorted(set(predictions) - set(order))[:5]
+    if extra:
+        raise ValueError(f"В таблице есть строки, отсутствующие в шаблоне: {extra}")
+
+    merged = [predictions.get(pair, template_rows[pair]) for pair in order]
+    stats = validate_rows(merged, expected_pairs=set(order))
+    write_rows(output_path, merged)
+    borrowed = len(order) - len(predictions)
+    if borrowed:
+        print(f"Из шаблона взято {borrowed} строк с пустым полем rle: "
+              f"по ним предсказаний этого модуля нет.")
     return stats
 
 

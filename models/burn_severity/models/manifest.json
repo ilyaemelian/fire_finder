@@ -1,0 +1,103 @@
+{
+  "module": "burn_severity",
+  "task": "Степень поражения гари по паре снимков Sentinel-2 до и после пожара",
+  "algorithm": "Двухэтапный XGBoost + U-Net(resnet34), смесь вероятностей; степень — пороговое правило dNBR",
+  "shape": [512, 512],
+  "classes": [0, 1, 2, 3],
+  "seed": 42,
+
+  "pass1": {
+    "weights": ["pass1_fold0.ubj", "pass1_fold1.ubj", "pass1_fold2.ubj", "pass1_fold3.ubj", "pass1_fold4.ubj"],
+    "task": "бинарная: гарь против фона, на множестве кандидатов dNBR выше порога покрова",
+    "features": 60,
+    "n_estimators": 800,
+    "learning_rate": 0.05,
+    "max_depth": 9,
+    "min_child_weight": 20,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "reg_lambda": 1.0,
+    "tree_method": "hist",
+    "objective": "binary:logistic",
+    "combination": "среднее вероятностей пяти фолдов",
+    "sha256": {
+      "pass1_fold0.ubj": "F910CD478F4EEA5E98141B63BFA3DA84D4E9F41F24C192480B24F277FDF97AD1",
+      "pass1_fold1.ubj": "2D21C03D5E6CC91825B4A963CEDC557F82A79957C113269C78E67FDCF5074F86",
+      "pass1_fold2.ubj": "5B88D9E0C573056FE2993C102C4348ECF13C41253BB36C4974D93CE22EFBC1F5",
+      "pass1_fold3.ubj": "A90EE4AD2155868FE1AC03E20754E6A6945099DC85828FDA9304FD5E2DEB0472",
+      "pass1_fold4.ubj": "3ED4994FE0E95B57D1646D1190DAE89A8DA81EAD2899A97793035755C0507946"
+    }
+  },
+
+  "pass2": {
+    "weights": "pass2.ubj",
+    "task": "то же бинарное решение с добавлением контекста карты вероятностей первого этапа",
+    "features": 70,
+    "features_breakdown": "60 признаков первого этапа + 10 контекстных",
+    "n_estimators": 800,
+    "objective": "binary:logistic",
+    "sha256": "CD8C62EC50DDCF489D64819CE7E38A8E535A8C3AA7185D378A8D52DB400800D4"
+  },
+
+  "unet": {
+    "weights": "unet_full_ep25.pt",
+    "normalisation": "unet_norm.json",
+    "architecture": "segmentation_models_pytorch.Unet, энкодер resnet34",
+    "encoder_weights_at_training": "imagenet",
+    "in_channels": 40,
+    "classes": 1,
+    "crop": 256,
+    "crops_per_chip": 4,
+    "batch": 8,
+    "optimizer": "AdamW",
+    "lr": 0.001,
+    "weight_decay": 0.0001,
+    "schedule": "OneCycleLR на 60 эпох, разгон 10 %",
+    "epoch_stop": 25,
+    "loss": "BCE + Dice",
+    "precision": "fp16 со скалированием градиентов",
+    "training_chips": 224,
+    "tta": "исходный чип и два отражения, вероятности усредняются",
+    "sha256": "49E3B63B80374692277717DA7F5549BF559ECA1B79298CF6DD53B2B2F0B40BE5",
+    "norm_sha256": "1044C2A985F9F5569B1F72309B34BE6665C69F9D8214C4F98680376D2E39D127"
+  },
+
+  "blend": {
+    "formula": "p = w · p_unet + (1 − w) · p_бустинг",
+    "unet_weight": 0.45,
+    "threshold": 0.4,
+    "selection": "вес, порог и число эпох подобраны по качеству смеси на территориально отложенной валидации"
+  },
+
+  "validation": "5 фолдов по блокам 1°×1°; соседние районы не попадают одновременно в обучение и проверку",
+  "metric": "Score = 0.35·F1_af + 0.35·IoU_burn + 0.30·mIoU_sev",
+  "measured_on_one_fold": {
+    "chips": 52,
+    "contribution_unet_only": 0.3703,
+    "contribution_boosting_only": 0.3778,
+    "contribution_blend": 0.3958,
+    "iou_class1_unet": 0.445,
+    "iou_class1_boosting": 0.440,
+    "iou_class3_unet": 0.698,
+    "iou_class3_boosting": 0.750
+  },
+
+  "severity_rule_agreement_inside_burn": 0.933,
+  "miou_sev_upper_bound_with_perfect_outline": 0.872,
+
+  "inference_verified": "модуль переписан из скрипта автора и сверен с ним: на синтетических чипах вероятность смеси совпадает побитово (max|Δp| = 0), матрицы степени идентичны",
+  "inference_seconds_per_chip_gpu": 1.21,
+  "inference_seconds_per_chip_cpu": 3.0,
+  "training_reproduced": false,
+
+  "result": "results/submission_bs.csv",
+  "result_sha256": "F6DDA13092DB65C9B6EDA5ED9D325CDF778EA282FC77DD1EA3DF3E5D6225B476",
+  "result_rows": 447,
+  "result_rows_bs": 267,
+  "result_nonempty": 253,
+  "result_pixels": 5409303,
+  "result_burnt_share": 0.2319,
+  "result_validated": true,
+  "result_stale": true,
+  "result_note": "таблица получена более ранней версией схемы: доля гари 23.19 % не совпадает ни с 18.9 % одного бустинга, ни с 16.4 % смеси, заявленными автором. Пересчитать командой python -m models.burn_severity.inference, после чего удалить старый файл."
+}

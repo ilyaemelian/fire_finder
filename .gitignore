@@ -7,6 +7,12 @@ __pycache__/
 frontend/node_modules/
 data/*
 !data/.gitkeep
+models/*/results/*.csv
+models/burn_severity/work/
+outputs/*
+!outputs/submission/
+outputs/submission/*
+!outputs/submission/.gitkeep
 catboost_info/
 .env
 *.log
