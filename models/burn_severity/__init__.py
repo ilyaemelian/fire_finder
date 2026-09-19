@@ -1,34 +1,39 @@
-"""Модель BS (burn severity) — степень поражения гари по Sentinel-2, CatBoost на dNBR.
+"""Модуль BS — степень поражения гари по снимкам Sentinel-2.
 
-Сущность самодостаточна: адаптер инференса, обучение, notebook-бейзлайн,
-веса в artifacts/ и результат в results/ лежат внутри этого пакета.
+Двухэтапная схема: бинарная модель контура гари, затем уточнение; степень
+внутри контура определяется пороговым правилом по индексу dNBR с учётом типа
+покрова. Переданы весовые коэффициенты XGBoost и результаты изучения данных;
+код расчёта предсказаний ожидается — см. README.md, раздел о недостающих файлах.
 """
 
 from pathlib import Path
 
-from .predict import (
-    BS_CLASSES,
-    BS_SHAPE,
-    BurnSeverityModel,
-    extract_features,
-    load_model,
-    predict_bs,
-    validate_bs_mask,
-)
-
 MODULE_ROOT = Path(__file__).resolve().parent
-WEIGHTS = MODULE_ROOT / "artifacts" / "baseline_bs_model.cbm"
-RESULTS = MODULE_ROOT / "results" / "burn_severity_catboost.csv"
+ARTIFACTS = MODULE_ROOT / "artifacts"
+RESULTS = MODULE_ROOT / "results" / "bs_submission.csv"
+
+BS_SHAPE = (512, 512)
+BS_CLASSES = (0, 1, 2, 3)
+
+# Пороги dNBR из постановки задачи: код WorldCover -> (слабое, среднее, сильное).
+SEVERITY_THRESHOLDS = {
+    10: (0.100, 0.270, 0.660),   # лес
+    20: (0.100, 0.270, 0.660),   # кустарник
+    30: (0.062, 0.204, 0.386),   # травы
+    40: (0.070, 0.177, 0.380),   # пашня
+    90: (0.075, 0.331, 0.677),   # болото, пойма
+}
+
+PASS1_WEIGHTS = tuple(sorted(ARTIFACTS.glob("pass1_fold*.ubj")))
+PASS2_WEIGHTS = ARTIFACTS / "pass2.ubj"
 
 __all__ = [
+    "ARTIFACTS",
     "BS_CLASSES",
     "BS_SHAPE",
-    "BurnSeverityModel",
     "MODULE_ROOT",
+    "PASS1_WEIGHTS",
+    "PASS2_WEIGHTS",
     "RESULTS",
-    "WEIGHTS",
-    "extract_features",
-    "load_model",
-    "predict_bs",
-    "validate_bs_mask",
+    "SEVERITY_THRESHOLDS",
 ]
