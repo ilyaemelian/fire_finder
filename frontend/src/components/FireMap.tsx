@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, GeoJSON, Rectangle, useMap, useMapEvents, CircleMarker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, GeoJSON, Rectangle, useMap, useMapEvents, CircleMarker, Popup, AttributionControl } from 'react-leaflet';
 import type { LatLngTuple } from 'leaflet';
 import type { Polygon } from 'geojson';
 import type { Dataset, Result } from '../types';
@@ -14,7 +14,8 @@ function Draw({enabled,onSelect,onStep}:{enabled:boolean;onSelect:(p:Polygon)=>v
 }
 export default function FireMap({dataset,result,selection,drawing,onSelect,showAF,showBS}:{dataset:Dataset;result:Result|null;selection:Polygon|null;drawing:boolean;onSelect:(p:Polygon)=>void;showAF:boolean;showBS:boolean}){
  const [second,setSecond]=useState(false);
- return <><MapContainer center={[46,39]} zoom={10} className="map" zoomControl={true}>
+ return <><MapContainer center={[46,39]} zoom={10} className="map" zoomControl={true} attributionControl={false}>
+ <AttributionControl position="bottomright" prefix={'<a href="https://leafletjs.com" title="Библиотека интерактивных карт">Leaflet</a>'}/>
  <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"/>
  <View dataset={dataset}/><Draw enabled={drawing} onSelect={onSelect} onStep={setSecond}/>
  {showBS&&result&&<GeoJSON key={result.result_id+'bs'} data={result.burned_areas} style={f=>({color:colors[f?.properties?.severity]||'#666',weight:1.5,fillOpacity:.57})} onEachFeature={(f,l)=>{const p=f.properties;const box=document.createElement('div');const title=document.createElement('strong');title.textContent='Контур гари';box.append(title);for(const value of [`${p.contour_id}`,`Степень: ${['','слабая','средняя','сильная'][p.severity]}`,`Площадь: ${Number(p.area_ha).toLocaleString('ru-RU',{maximumFractionDigits:2})} га`,`Снимки: ${p.date_pre} → ${p.date_post}`,`Модель: ${p.model_version}`,dataset.data_mode==='synthetic'?'Синтетический пример':dataset.source]){const line=document.createElement('div');line.textContent=value;box.append(line);}l.bindPopup(box);}}/>}

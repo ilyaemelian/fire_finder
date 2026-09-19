@@ -11,7 +11,11 @@
   "min_child_samples": 40,
   "reg_lambda": 1.0,
   "probability_threshold": 0.995,
-  "context_windows": [5, 11, 21],
+  "context_windows": [
+    5,
+    11,
+    21
+  ],
   "negatives_per_chip": 1500,
   "flare_share": 0.3,
   "flare_weight": 10.0,
@@ -33,5 +37,5 @@
   "inference_verified": "модель загружена, predict_af вернул бинарную матрицу 256x256 uint8 на синтетическом чипе VIIRS",
   "inference_seconds_per_chip": 0.74,
   "training_reproduced": false,
-  "superseded": "artifacts/legacy — детекция YOLO11n, F1_af 0.4176"
+  "superseded_approach": "детекция YOLO11n, F1_af 0.4176; разбор в README модуля"
 }
